@@ -143,9 +143,13 @@ export default function App() {
   const [formStatus, setFormStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  // Skill Randomizer State
-  const [featuredSkill, setFeaturedSkill] = useState<Skill>(SKILLS[0]);
-  const [skillRotation, setSkillRotation] = useState(0);
+  // Skill Matching Game State
+  const [skillA, setSkillA] = useState<Skill>(SKILLS[Math.floor(Math.random() * SKILLS.length)]);
+  const [skillB, setSkillB] = useState<Skill>(SKILLS[Math.floor(Math.random() * SKILLS.length)]);
+  const [gameScore, setGameScore] = useState(0);
+  const [gameStreak, setGameStreak] = useState(0);
+  const [gameMessage, setGameMessage] = useState('');
+  const [gameLoading, setGameLoading] = useState(false);
 
   // --- Effects ---
   
@@ -203,11 +207,47 @@ export default function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Skill Randomizer
-  const randomizeSkill = () => {
-    setSkillRotation(prev => prev + 360);
-    const randomSkill = SKILLS[Math.floor(Math.random() * SKILLS.length)];
-    setFeaturedSkill(randomSkill);
+  // Skill Matching Game Logic
+  const getProficiencyLevel = (prof: string): number => {
+    if (prof === 'Advanced') return 3;
+    if (prof === 'Intermediate') return 2;
+    return 1;
+  };
+
+  const generateNewRound = () => {
+    let newSkillA = SKILLS[Math.floor(Math.random() * SKILLS.length)];
+    let newSkillB = SKILLS[Math.floor(Math.random() * SKILLS.length)];
+    // Ensure they're different
+    while (newSkillB.id === newSkillA.id) {
+      newSkillB = SKILLS[Math.floor(Math.random() * SKILLS.length)];
+    }
+    setSkillA(newSkillA);
+    setSkillB(newSkillB);
+    setGameMessage('');
+    setGameLoading(false);
+  };
+
+  const handleSkillChoice = (selectedSkill: Skill) => {
+    setGameLoading(true);
+    const levelA = getProficiencyLevel(skillA.proficiency);
+    const levelB = getProficiencyLevel(skillB.proficiency);
+    const correctSkill = levelA > levelB ? skillA : levelB > levelA ? skillB : skillA;
+    
+    const isCorrect = selectedSkill.id === correctSkill.id;
+    
+    setTimeout(() => {
+      if (isCorrect) {
+        setGameScore(prev => prev + 1);
+        setGameStreak(prev => prev + 1);
+        setGameMessage(`✅ Correct! ${correctSkill.name} (${correctSkill.proficiency})`);
+      } else {
+        setGameStreak(0);
+        setGameMessage(`❌ Wrong! ${correctSkill.name} (${correctSkill.proficiency}) is more advanced`);
+      }
+      setTimeout(() => {
+        generateNewRound();
+      }, 1500);
+    }, 300);
   };
 
   // Complex Sorting & Filtering (Requirement 3)
@@ -329,66 +369,117 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="space-y-12"
           >
-            {/* Skill Randomizer Game */}
+            {/* Skill Matching Game */}
             <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-900 rounded-3xl p-8 md:p-12 text-white shadow-2xl shadow-emerald-600/20">
-              <div className="space-y-6">
-                <div>
-                  <h2 className="text-3xl font-bold mb-2">🎮 Skill Randomizer</h2>
-                  <p className="text-emerald-100">Discover a random skill from my arsenal!</p>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row gap-8 items-center">
-                  <motion.div 
-                    animate={{ rotate: skillRotation }}
-                    transition={{ duration: 0.6, ease: 'easeOut' }}
-                    className="flex-shrink-0"
-                  >
-                    <div className="w-32 h-32 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-6xl border-2 border-white/30 shadow-xl">
-                      {featuredSkill.icon}
+              <div className="space-y-8">
+                {/* Header & Score */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-3xl font-bold mb-2">🎮 Skill Matching Game</h2>
+                    <p className="text-emerald-100">Pick which skill is more advanced!</p>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-center px-4 py-2 bg-white/20 backdrop-blur-md rounded-xl border border-white/30">
+                      <p className="text-xs text-emerald-100 uppercase font-bold">Score</p>
+                      <p className="text-3xl font-black">{gameScore}</p>
                     </div>
-                  </motion.div>
-                  
-                  <div className="flex-1 space-y-4">
-                    <motion.div
-                      key={featuredSkill.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
-                      <div>
-                        <h3 className="text-3xl font-bold">{featuredSkill.name}</h3>
-                        <p className="text-emerald-100 text-sm">{featuredSkill.category}</p>
+                    {gameStreak > 0 && (
+                      <div className="text-center px-4 py-2 bg-yellow-400/20 backdrop-blur-md rounded-xl border border-yellow-300/50">
+                        <p className="text-xs text-yellow-100 uppercase font-bold">🔥 Streak</p>
+                        <p className="text-2xl font-black">{gameStreak}</p>
                       </div>
-                      <p className="text-emerald-50 leading-relaxed">{featuredSkill.description}</p>
-                      <div className="flex items-center gap-3">
-                        <span className={`px-4 py-1 rounded-full text-sm font-bold ${
-                          featuredSkill.proficiency === 'Advanced' ? 'bg-yellow-400/20 text-yellow-100' :
-                          featuredSkill.proficiency === 'Intermediate' ? 'bg-blue-400/20 text-blue-100' :
-                          'bg-green-400/20 text-green-100'
-                        }`}>
-                          {featuredSkill.proficiency}
-                        </span>
-                        <Zap className="w-5 h-5 text-yellow-300" />
-                      </div>
-                    </motion.div>
-                    
-                    <button 
-                      onClick={randomizeSkill}
-                      className="mt-6 px-6 py-3 bg-white text-emerald-600 font-bold rounded-xl hover:bg-emerald-50 hover:scale-105 active:scale-95 transition-all flex items-center gap-2 group"
-                    >
-                      <Dices className="w-5 h-5 group-hover:rotate-12 transition-transform" />
-                      Randomize Skill
-                    </button>
+                    )}
                   </div>
                 </div>
+
+                {/* Game Message */}
+                <AnimatePresence>
+                  {gameMessage && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className={`p-4 rounded-xl text-center font-bold ${
+                        gameMessage.startsWith('✅') 
+                          ? 'bg-green-400/20 border border-green-300/50 text-green-100'
+                          : 'bg-red-400/20 border border-red-300/50 text-red-100'
+                      }`}
+                    >
+                      {gameMessage}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Skills Comparison */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  {/* Skill A */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSkillChoice(skillA)}
+                    disabled={gameLoading}
+                    className="p-6 bg-white/10 backdrop-blur-md border-2 border-white/30 hover:border-white/60 hover:bg-white/20 rounded-2xl text-left transition-all disabled:opacity-50 group"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-5xl">{skillA.icon}</span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        skillA.proficiency === 'Advanced' ? 'bg-yellow-400/30 text-yellow-100' :
+                        skillA.proficiency === 'Intermediate' ? 'bg-blue-400/30 text-blue-100' :
+                        'bg-green-400/30 text-green-100'
+                      }`}>
+                        {skillA.proficiency}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-bold mb-1">{skillA.name}</h3>
+                    <p className="text-emerald-100 text-sm mb-3">{skillA.category}</p>
+                    <p className="text-emerald-50 text-sm line-clamp-2">{skillA.description}</p>
+                    <p className="mt-4 text-xs text-emerald-200 font-bold uppercase">← Click to select</p>
+                  </motion.button>
+
+                  {/* Skill B */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleSkillChoice(skillB)}
+                    disabled={gameLoading}
+                    className="p-6 bg-white/10 backdrop-blur-md border-2 border-white/30 hover:border-white/60 hover:bg-white/20 rounded-2xl text-left transition-all disabled:opacity-50 group"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-5xl">{skillB.icon}</span>
+                      <span className={`text-xs font-bold px-2 py-1 rounded ${
+                        skillB.proficiency === 'Advanced' ? 'bg-yellow-400/30 text-yellow-100' :
+                        skillB.proficiency === 'Intermediate' ? 'bg-blue-400/30 text-blue-100' :
+                        'bg-green-400/30 text-green-100'
+                      }`}>
+                        {skillB.proficiency}
+                      </span>
+                    </div>
+                    <h3 className="text-2xl font-bold mb-1">{skillB.name}</h3>
+                    <p className="text-emerald-100 text-sm mb-3">{skillB.category}</p>
+                    <p className="text-emerald-50 text-sm line-clamp-2">{skillB.description}</p>
+                    <p className="mt-4 text-xs text-emerald-200 font-bold uppercase">Click to select →</p>
+                  </motion.button>
+                </div>
+
+                {/* Reset Button */}
+                <button
+                  onClick={() => {
+                    setGameScore(0);
+                    setGameStreak(0);
+                    generateNewRound();
+                  }}
+                  className="w-full px-6 py-3 bg-white/20 hover:bg-white/30 border border-white/40 text-white font-bold rounded-xl transition-all"
+                >
+                  🔄 Reset Game
+                </button>
               </div>
             </div>
 
-            {/* Skills Grid */}
+            {/* All Skills Grid */}
             <div className="space-y-6">
               <div>
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">All Skills</h2>
-                <p className="text-slate-500 dark:text-slate-400">Organized by category and proficiency level</p>
+                <p className="text-slate-500 dark:text-slate-400">Your complete skill set across all categories</p>
               </div>
               
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -399,8 +490,7 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.05 }}
                     whileHover={{ y: -5 }}
-                    onClick={() => setFeaturedSkill(skill)}
-                    className="p-6 bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-400 cursor-pointer transition-all group shadow-sm hover:shadow-lg hover:shadow-emerald-500/20"
+                    className="p-6 bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-400 transition-all group shadow-sm hover:shadow-lg hover:shadow-emerald-500/20"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <span className="text-4xl">{skill.icon}</span>
@@ -417,9 +507,6 @@ export default function App() {
                     <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
                       {skill.description}
                     </p>
-                    <button className="mt-4 text-emerald-600 dark:text-emerald-400 font-bold text-xs uppercase tracking-wider group-hover:gap-2 transition-all flex items-center gap-1">
-                      Feature <Sparkles className="w-3 h-3" />
-                    </button>
                   </motion.div>
                 ))}
               </div>
